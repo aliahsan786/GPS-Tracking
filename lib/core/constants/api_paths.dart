@@ -9,6 +9,7 @@ class ApiPaths {
 
   // Auth
   static const String authGoogle = '/api_auth_google.php';
+  static const String authApple = '/api_auth_apple.php';
 
   // Tracking sessions
   static const String sessionsStart = '/api_tracking_start.php';

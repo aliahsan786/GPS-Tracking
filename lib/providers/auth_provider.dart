@@ -7,6 +7,7 @@ import '../core/events/auth_events_bus.dart';
 import '../models/auth_status.dart';
 import '../models/user.dart';
 import '../repositories/auth_repository.dart';
+import '../services/apple_sign_in_service.dart';
 import '../services/google_sign_in_service.dart';
 import '../services/secure_storage_service.dart';
 
@@ -15,6 +16,7 @@ import '../services/secure_storage_service.dart';
 class AuthProvider extends ChangeNotifier {
   final AuthRepository _repo;
   final GoogleSignInService _google;
+  final AppleSignInService _apple;
   final SecureStorageService _storage;
   final AuthEventsBus _bus;
   late final StreamSubscription<AuthEvent> _busSub;
@@ -26,10 +28,12 @@ class AuthProvider extends ChangeNotifier {
   AuthProvider({
     required AuthRepository repo,
     required GoogleSignInService google,
+    required AppleSignInService apple,
     required SecureStorageService storage,
     required AuthEventsBus bus,
   })  : _repo = repo,
         _google = google,
+        _apple = apple,
         _storage = storage,
         _bus = bus {
     _busSub = _bus.stream.listen(_onBusEvent);
@@ -81,6 +85,46 @@ class AuthProvider extends ChangeNotifier {
     } on GoogleSignInFailed catch (e, stack) {
       _errorMessage = _devMessage(
         'Google sign-in failed. Check OAuth config.',
+        e,
+        stack,
+      );
+      _status = AuthStatus.unauthenticated;
+    } catch (e, stack) {
+      _errorMessage = _devMessage(
+        'Please try again or check your connection',
+        e,
+        stack,
+      );
+      _status = AuthStatus.unauthenticated;
+    }
+    notifyListeners();
+  }
+
+  Future<void> signInWithApple() async {
+    if (_status == AuthStatus.signingIn) return;
+
+    _errorMessage = null;
+    _status = AuthStatus.signingIn;
+    notifyListeners();
+
+    try {
+      final idToken = await _apple.signIn();
+      if (idToken == null) {
+        _status = AuthStatus.unauthenticated;
+        notifyListeners();
+        return;
+      }
+
+      final result = await _repo.exchangeAppleToken(idToken);
+      await _storage.writeSessionToken(result.sessionToken);
+      _user = result.user;
+      _status = AuthStatus.authenticated;
+    } on DomainError catch (e, stack) {
+      _errorMessage = _devMessage(_messageFor(e), e, stack);
+      _status = AuthStatus.unauthenticated;
+    } on AppleSignInFailed catch (e, stack) {
+      _errorMessage = _devMessage(
+        'Apple sign-in failed. Check configuration.',
         e,
         stack,
       );

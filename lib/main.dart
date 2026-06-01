@@ -2,7 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gps_tracking/firebase_options.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
 
 import 'core/events/auth_events_bus.dart';
@@ -18,6 +18,7 @@ import 'repositories/tracking_repository.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/splash/splash_screen.dart';
 import 'screens/tracking/tracking_screen_host.dart';
+import 'services/apple_sign_in_service.dart';
 import 'services/api_client.dart';
 import 'services/connectivity_service.dart';
 import 'services/google_sign_in_service.dart';
@@ -27,17 +28,17 @@ import 'services/secure_storage_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   // Warm cream chrome so system bars blend with the app background.
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.dark,
-    systemNavigationBarColor: AppColors.backgroundCream,
-    systemNavigationBarIconBrightness: Brightness.dark,
-  ));
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+      systemNavigationBarColor: AppColors.backgroundCream,
+      systemNavigationBarIconBrightness: Brightness.dark,
+    ),
+  );
 
   // Persistent queue for offline location points. Must be ready before
   // anything can enqueue.
@@ -54,24 +55,29 @@ Future<void> main() async {
   final storage = SecureStorageServiceImpl();
   final apiClient = ApiClient(storage: storage, authEvents: authEvents);
   final googleSignIn = GoogleSignInServiceImpl();
+  final appleSignIn = AppleSignInServiceImpl();
   final locationService = LocationServiceImpl();
   final connectivityService = ConnectivityServiceImpl();
 
-  runApp(FanthrofitApp(
-    storage: storage,
-    apiClient: apiClient,
-    googleSignIn: googleSignIn,
-    locationService: locationService,
-    connectivityService: connectivityService,
-    queueService: queueService,
-    authEvents: authEvents,
-  ));
+  runApp(
+    FanthrofitApp(
+      storage: storage,
+      apiClient: apiClient,
+      googleSignIn: googleSignIn,
+      appleSignIn: appleSignIn,
+      locationService: locationService,
+      connectivityService: connectivityService,
+      queueService: queueService,
+      authEvents: authEvents,
+    ),
+  );
 }
 
 class FanthrofitApp extends StatelessWidget {
   final SecureStorageService storage;
   final ApiClient apiClient;
   final GoogleSignInService googleSignIn;
+  final AppleSignInService appleSignIn;
   final LocationService locationService;
   final ConnectivityService connectivityService;
   final LocalQueueService queueService;
@@ -82,6 +88,7 @@ class FanthrofitApp extends StatelessWidget {
     required this.storage,
     required this.apiClient,
     required this.googleSignIn,
+    required this.appleSignIn,
     required this.locationService,
     required this.connectivityService,
     required this.queueService,
@@ -96,6 +103,7 @@ class FanthrofitApp extends StatelessWidget {
         Provider<SecureStorageService>.value(value: storage),
         Provider<ApiClient>.value(value: apiClient),
         Provider<GoogleSignInService>.value(value: googleSignIn),
+        Provider<AppleSignInService>.value(value: appleSignIn),
         Provider<LocationService>.value(value: locationService),
         Provider<ConnectivityService>.value(value: connectivityService),
         Provider<LocalQueueService>.value(value: queueService),
@@ -123,6 +131,7 @@ class FanthrofitApp extends StatelessWidget {
           create: (ctx) => AuthProvider(
             repo: ctx.read<AuthRepository>(),
             google: ctx.read<GoogleSignInService>(),
+            apple: ctx.read<AppleSignInService>(),
             storage: ctx.read<SecureStorageService>(),
             bus: ctx.read<AuthEventsBus>(),
           ),

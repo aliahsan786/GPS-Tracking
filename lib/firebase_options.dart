@@ -59,10 +59,12 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyAVzHjPSqgRw-7I2zdEzcxXdJLko-_TRRE',
-    appId: '1:1021928700381:ios:9eada52f153aa735e15e34',
+    appId: '1:1021928700381:ios:d9a6574eaed3b92be15e34',
     messagingSenderId: '1021928700381',
     projectId: 'gps-tracking-a3689',
     storageBucket: 'gps-tracking-a3689.firebasestorage.app',
-    iosBundleId: 'com.example.gpsTracking',
+    iosClientId:
+        '1021928700381-bu4l7jittb8k47tp5f31016702ej1t14.apps.googleusercontent.com',
+    iosBundleId: 'com.fanthrofitpro.gps',
   );
 }
