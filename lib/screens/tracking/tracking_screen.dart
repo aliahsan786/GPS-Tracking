@@ -22,7 +22,6 @@ import '../../widgets/tracking/tracking_background.dart';
 class TrackingScreen extends StatelessWidget {
   final TrackingUiState state;
   final VoidCallback onStartTracking;
-  final VoidCallback onPauseTracking;
   final VoidCallback onStopTracking;
   final VoidCallback onRetrySync;
   final VoidCallback onLoginAgain;
@@ -32,7 +31,6 @@ class TrackingScreen extends StatelessWidget {
     super.key,
     required this.state,
     required this.onStartTracking,
-    required this.onPauseTracking,
     required this.onStopTracking,
     required this.onRetrySync,
     required this.onLoginAgain,
@@ -70,7 +68,6 @@ class TrackingScreen extends StatelessWidget {
     // body that fills the available vertical space.
     return switch (state) {
       TrackingInitializing() => _InitializingBody(
-          onPause: onPauseTracking,
           onStop: onStopTracking,
         ),
       TrackingIdle(:final lastActivity, :final isOffline) => _IdleBody(
@@ -93,7 +90,6 @@ class TrackingScreen extends StatelessWidget {
           distance: Formatters.distance(session.distanceMeters),
           time: Formatters.duration(session.duration),
           isOffline: isOffline,
-          onPause: onPauseTracking,
           onStop: onStopTracking,
         ),
       TrackingSyncing(:final bytesSent, :final bytesTotal) => _SyncingBody(
@@ -118,10 +114,9 @@ class TrackingScreen extends StatelessWidget {
 
 /// S_Init — Initializing (permissions + session creation in flight)
 class _InitializingBody extends StatelessWidget {
-  final VoidCallback onPause;
   final VoidCallback onStop;
 
-  const _InitializingBody({required this.onPause, required this.onStop});
+  const _InitializingBody({required this.onStop});
 
   @override
   Widget build(BuildContext context) {
@@ -135,23 +130,10 @@ class _InitializingBody extends StatelessWidget {
             pinIcon: Icons.language_rounded,
           ),
         ),
-        Row(
-          children: [
-            Expanded(
-              child: PrimaryButton(
-                label: 'Pause Tracking',
-                onPressed: onPause,
-                variant: PrimaryButtonVariant.teal,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: PrimaryButton(
-                label: 'Stop Tracking',
-                onPressed: onStop,
-              ),
-            ),
-          ],
+        // Design: single full-width Stop button (no Pause).
+        PrimaryButton(
+          label: 'Stop Tracking',
+          onPressed: onStop,
         ),
       ],
     );
@@ -207,7 +189,6 @@ class _ActiveBody extends StatelessWidget {
   final String distance;
   final String time;
   final bool isOffline;
-  final VoidCallback onPause;
   final VoidCallback onStop;
 
   const _ActiveBody({
@@ -215,7 +196,6 @@ class _ActiveBody extends StatelessWidget {
     required this.distance,
     required this.time,
     required this.isOffline,
-    required this.onPause,
     required this.onStop,
   });
 
@@ -237,23 +217,10 @@ class _ActiveBody extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.md),
         ],
-        Row(
-          children: [
-            Expanded(
-              child: PrimaryButton(
-                label: 'Pause Tracking',
-                onPressed: onPause,
-                variant: PrimaryButtonVariant.teal,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: PrimaryButton(
-                label: 'Stop Tracking',
-                onPressed: onStop,
-              ),
-            ),
-          ],
+        // Design: a single full-width Stop button (no Pause).
+        PrimaryButton(
+          label: 'Stop Tracking',
+          onPressed: onStop,
         ),
       ],
     );

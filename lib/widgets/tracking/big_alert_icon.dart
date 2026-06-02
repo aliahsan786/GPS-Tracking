@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_colors.dart';
-
 /// The large red alert circle shown on SyncFailed (S6) and
 /// SessionExpired (S8) states. Radial fade, no animation.
 class BigAlertIcon extends StatelessWidget {

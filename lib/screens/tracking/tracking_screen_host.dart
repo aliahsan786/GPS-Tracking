@@ -27,7 +27,6 @@ class TrackingScreenHost extends StatelessWidget {
         return TrackingScreen(
           state: state,
           onStartTracking: tracking.startTracking,
-          onPauseTracking: tracking.stopTracking,
           onStopTracking: tracking.stopTracking,
           onRetrySync: tracking.retrySync,
           onLoginAgain: () => _logoutToLogin(context),

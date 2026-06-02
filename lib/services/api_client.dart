@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../core/config/env.dart';
 import '../core/errors/domain_error.dart';
@@ -41,6 +42,18 @@ class ApiClient {
 
     _dio.interceptors.add(InterceptorsWrapper(
       onError: (error, handler) {
+        // TEMP DIAGNOSTIC: dump the exact request + response so we can
+        // hand the raw payloads to the backend team. Debug builds only.
+        if (kDebugMode) {
+          final req = error.requestOptions;
+          debugPrint('───── API ERROR ─────');
+          debugPrint('POST ${req.uri}');
+          debugPrint('REQUEST BODY: ${req.data}');
+          debugPrint('STATUS: ${error.response?.statusCode}');
+          debugPrint('RESPONSE BODY: ${error.response?.data}');
+          debugPrint('DIO TYPE: ${error.type} | ${error.message}');
+          debugPrint('─────────────────────');
+        }
         if (error.response?.statusCode == 401) {
           _authEvents.emit(SessionExpiredEvent());
         }
