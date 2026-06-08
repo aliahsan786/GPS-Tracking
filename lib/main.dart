@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import 'core/events/auth_events_bus.dart';
 import 'core/router/app_routes.dart';
+import 'core/theme/app_assets.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'providers/auth_provider.dart';
@@ -25,14 +26,34 @@ import 'services/google_sign_in_service.dart';
 import 'services/local_queue_service.dart';
 import 'services/location_service.dart';
 import 'services/secure_storage_service.dart';
+import 'services/theme_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // Warm cream chrome so system bars blend with the app background.
+  // Hive must be ready before the offline queue *and* the theme cache.
+  await Hive.initFlutter();
+
+  // Fetch the remote brand theme (colors + logo + background) and apply it
+  // before the first frame, so the whole app renders themed. Best-effort:
+  // falls back to the cached or baked-in defaults on any failure.
+  final theme = await ThemeServiceImpl().load();
+  AppColors.applyTheme(
+    primary: theme.primary,
+    secondary: theme.secondary,
+    accent: theme.accent,
+    background: theme.background,
+    text: theme.text,
+  );
+  AppRemoteAssets.applyTheme(
+    logoUrl: theme.logoUrl,
+    backgroundUrl: theme.backgroundUrl,
+  );
+
+  // Warm chrome so system bars blend with the (themed) app background.
   SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
+    SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
       systemNavigationBarColor: AppColors.backgroundCream,
@@ -42,7 +63,6 @@ Future<void> main() async {
 
   // Persistent queue for offline location points. Must be ready before
   // anything can enqueue.
-  await Hive.initFlutter();
   final queueService = LocalQueueServiceImpl();
   await queueService.init();
 

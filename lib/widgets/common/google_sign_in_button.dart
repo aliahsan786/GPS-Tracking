@@ -47,7 +47,7 @@ class GoogleSignInButton extends StatelessWidget {
                   ),
                 ),
                 if (loading)
-                  const SizedBox(
+                  SizedBox(
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(

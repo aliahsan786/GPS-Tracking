@@ -10,7 +10,7 @@ class AppTheme {
   AppTheme._();
 
   static ThemeData get light {
-    const scheme = ColorScheme.light(
+    final scheme = ColorScheme.light(
       primary: AppColors.primaryRed,
       onPrimary: AppColors.surfaceWhite,
       secondary: AppColors.secondaryTeal,

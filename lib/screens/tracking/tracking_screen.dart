@@ -122,7 +122,7 @@ class _InitializingBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        const Expanded(
+        Expanded(
           child: _PinAndStatus(
             label: 'Initializing Portal',
             subtitle: 'Securely connecting to synchronisation\nnode. Verifying satellite handshake.',
@@ -277,7 +277,7 @@ class _AlertBody extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
+            Icon(
               Icons.access_time_rounded,
               size: 16,
               color: AppColors.textSoft,
@@ -297,13 +297,15 @@ class _AlertBody extends StatelessWidget {
 class _PinAndStatus extends StatelessWidget {
   final String label;
   final String? subtitle;
-  final Color pinColor;
+  /// Null defaults to the themed teal (resolved at build time, since
+  /// theme colors are non-const).
+  final Color? pinColor;
   final IconData pinIcon;
 
   const _PinAndStatus({
     required this.label,
     this.subtitle,
-    this.pinColor = AppColors.secondaryTeal,
+    this.pinColor,
     this.pinIcon = Icons.location_on_rounded,
   });
 
@@ -312,7 +314,11 @@ class _PinAndStatus extends StatelessWidget {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        PulsingPin(size: 140, color: pinColor, icon: pinIcon),
+        PulsingPin(
+          size: 140,
+          color: pinColor ?? AppColors.secondaryTeal,
+          icon: pinIcon,
+        ),
         const SizedBox(height: AppSpacing.xl),
         Text(label, style: AppTextStyles.h2),
         if (subtitle != null) ...[

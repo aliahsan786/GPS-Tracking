@@ -8,13 +8,16 @@ import '../../core/theme/app_colors.dart';
 /// Pass [color] = orange for the Initializing state.
 class PulsingPin extends StatefulWidget {
   final double size;
-  final Color color;
+
+  /// Pin tint. Null defaults to the themed teal (resolved at build time,
+  /// since theme colors are non-const).
+  final Color? color;
   final IconData icon;
 
   const PulsingPin({
     super.key,
     this.size = 120,
-    this.color = AppColors.secondaryTeal,
+    this.color,
     this.icon = Icons.location_on_rounded,
   });
 
@@ -25,6 +28,8 @@ class PulsingPin extends StatefulWidget {
 class _PulsingPinState extends State<PulsingPin>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
+
+  Color get _color => widget.color ?? AppColors.secondaryTeal;
 
   @override
   void initState() {
@@ -64,12 +69,12 @@ class _PulsingPinState extends State<PulsingPin>
                 height: centerSize,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: widget.color.withValues(alpha: 0.25),
+                  color: _color.withValues(alpha: 0.25),
                 ),
                 child: Icon(
                   widget.icon,
                   size: iconSize,
-                  color: widget.color,
+                  color: _color,
                 ),
               ),
             ],
@@ -89,7 +94,7 @@ class _PulsingPinState extends State<PulsingPin>
       height: widget.size * scale,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: widget.color.withValues(alpha: opacity),
+        color: _color.withValues(alpha: opacity),
       ),
     );
   }
