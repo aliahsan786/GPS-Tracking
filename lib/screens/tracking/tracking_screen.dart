@@ -67,47 +67,41 @@ class TrackingScreen extends StatelessWidget {
     // Dart 3 pattern matching — each branch returns a variant-specific
     // body that fills the available vertical space.
     return switch (state) {
-      TrackingInitializing() => _InitializingBody(
-          onStop: onStopTracking,
-        ),
+      TrackingInitializing() => _InitializingBody(onStop: onStopTracking),
       TrackingIdle(:final lastActivity, :final isOffline) => _IdleBody(
-          activityName: lastActivity?.name,
-          distance: lastActivity != null
-              ? Formatters.distance(lastActivity.distanceMeters)
-              : null,
-          time: lastActivity != null
-              ? Formatters.duration(lastActivity.duration)
-              : null,
-          isOffline: isOffline,
-          onStart: onStartTracking,
-        ),
-      TrackingActive(
-        :final session,
-        :final isOffline,
-      ) =>
-        _ActiveBody(
-          activityName: session.activityName,
-          distance: Formatters.distance(session.distanceMeters),
-          time: Formatters.duration(session.duration),
-          isOffline: isOffline,
-          onStop: onStopTracking,
-        ),
+        activityName: lastActivity?.name,
+        distance: lastActivity != null
+            ? Formatters.distance(lastActivity.distanceMeters)
+            : null,
+        time: lastActivity != null
+            ? Formatters.duration(lastActivity.duration)
+            : null,
+        isOffline: isOffline,
+        onStart: onStartTracking,
+      ),
+      TrackingActive(:final session, :final isOffline) => _ActiveBody(
+        activityName: session.activityName,
+        distance: Formatters.distance(session.distanceMeters),
+        time: Formatters.duration(session.duration),
+        isOffline: isOffline,
+        onStop: onStopTracking,
+      ),
       TrackingSyncing(:final bytesSent, :final bytesTotal) => _SyncingBody(
-          bytesSent: bytesSent,
-          bytesTotal: bytesTotal,
-        ),
+        bytesSent: bytesSent,
+        bytesTotal: bytesTotal,
+      ),
       TrackingSyncFailed(:final lastSyncAt) => _AlertBody(
-          title: 'Sync failed',
-          subtitle: 'Last sync: ${Formatters.clockTime(lastSyncAt)}',
-          buttonLabel: 'Retry',
-          onPressed: onRetrySync,
-        ),
+        title: 'Sync failed',
+        subtitle: 'Last sync: ${Formatters.clockTime(lastSyncAt)}',
+        buttonLabel: 'Retry',
+        onPressed: onRetrySync,
+      ),
       TrackingSessionExpired(:final lastSyncAt) => _AlertBody(
-          title: 'Session expired',
-          subtitle: 'Last sync: ${Formatters.clockTime(lastSyncAt)}',
-          buttonLabel: 'Login Again',
-          onPressed: onLoginAgain,
-        ),
+        title: 'Session expired',
+        subtitle: 'Last sync: ${Formatters.clockTime(lastSyncAt)}',
+        buttonLabel: 'Login Again',
+        onPressed: onLoginAgain,
+      ),
     };
   }
 }
@@ -125,16 +119,14 @@ class _InitializingBody extends StatelessWidget {
         Expanded(
           child: _PinAndStatus(
             label: 'Initializing Portal',
-            subtitle: 'Securely connecting to synchronisation\nnode. Verifying satellite handshake.',
+            subtitle:
+                'Securely connecting to synchronisation\nnode. Verifying satellite handshake.',
             pinColor: AppColors.cardOrange,
             pinIcon: Icons.language_rounded,
           ),
         ),
         // Design: single full-width Stop button (no Pause).
-        PrimaryButton(
-          label: 'Stop Tracking',
-          onPressed: onStop,
-        ),
+        PrimaryButton(label: 'Stop Tracking', onPressed: onStop),
       ],
     );
   }
@@ -160,12 +152,8 @@ class _IdleBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        StatsCard(
-          activityName: activityName,
-          distance: distance,
-          time: time,
-        ),
-        const Expanded(child: _PinAndStatus(label: 'Tracking in off')),
+        StatsCard(activityName: activityName, distance: distance, time: time),
+        const Expanded(child: _PinAndStatus(label: 'Tracking is off')),
         if (isOffline) ...[
           const AlertBanner(
             icon: Icons.wifi_off_rounded,
@@ -218,10 +206,7 @@ class _ActiveBody extends StatelessWidget {
           const SizedBox(height: AppSpacing.md),
         ],
         // Design: a single full-width Stop button (no Pause).
-        PrimaryButton(
-          label: 'Stop Tracking',
-          onPressed: onStop,
-        ),
+        PrimaryButton(label: 'Stop Tracking', onPressed: onStop),
       ],
     );
   }
@@ -232,10 +217,7 @@ class _SyncingBody extends StatelessWidget {
   final int bytesSent;
   final int bytesTotal;
 
-  const _SyncingBody({
-    required this.bytesSent,
-    required this.bytesTotal,
-  });
+  const _SyncingBody({required this.bytesSent, required this.bytesTotal});
 
   @override
   Widget build(BuildContext context) {
@@ -297,6 +279,7 @@ class _AlertBody extends StatelessWidget {
 class _PinAndStatus extends StatelessWidget {
   final String label;
   final String? subtitle;
+
   /// Null defaults to the themed teal (resolved at build time, since
   /// theme colors are non-const).
   final Color? pinColor;
