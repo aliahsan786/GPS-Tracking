@@ -51,6 +51,7 @@ class ThemeServiceImpl implements ThemeService {
     text: Color(0xFF56442A),
     logoUrl: null,
     backgroundUrl: null,
+    webviewStartUrl: null,
     trackingIntervalSeconds: 5,
   );
 

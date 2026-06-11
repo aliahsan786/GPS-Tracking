@@ -21,6 +21,7 @@ class ThemeConfig {
   final String? backgroundUrl;
 
   // App config.
+  final String? webviewStartUrl;
   final int trackingIntervalSeconds;
 
   const ThemeConfig({
@@ -32,6 +33,7 @@ class ThemeConfig {
     required this.text,
     required this.logoUrl,
     required this.backgroundUrl,
+    required this.webviewStartUrl,
     required this.trackingIntervalSeconds,
   });
 
@@ -66,6 +68,10 @@ class ThemeConfig {
       text: color('text', defaults.text),
       logoUrl: url('logo_url', defaults.logoUrl),
       backgroundUrl: url('background_url', defaults.backgroundUrl),
+      webviewStartUrl: (app is Map && app['webview_start_url'] is String &&
+              (app['webview_start_url'] as String).isNotEmpty)
+          ? app['webview_start_url'] as String
+          : defaults.webviewStartUrl,
       trackingIntervalSeconds: (app is Map && app['tracking_interval_seconds'] is int)
           ? app['tracking_interval_seconds'] as int
           : defaults.trackingIntervalSeconds,
@@ -87,6 +93,7 @@ class ThemeConfig {
           'background_url': backgroundUrl,
         },
         'app': {
+          'webview_start_url': webviewStartUrl,
           'tracking_interval_seconds': trackingIntervalSeconds,
         },
       };

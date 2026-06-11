@@ -10,6 +10,7 @@ import 'core/router/app_routes.dart';
 import 'core/theme/app_assets.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
+import 'models/theme_config.dart';
 import 'providers/auth_provider.dart';
 import 'providers/connectivity_provider.dart';
 import 'providers/tracking_provider.dart';
@@ -81,6 +82,7 @@ Future<void> main() async {
 
   runApp(
     FanthrofitApp(
+      theme: theme,
       storage: storage,
       apiClient: apiClient,
       googleSignIn: googleSignIn,
@@ -94,6 +96,7 @@ Future<void> main() async {
 }
 
 class FanthrofitApp extends StatelessWidget {
+  final ThemeConfig theme;
   final SecureStorageService storage;
   final ApiClient apiClient;
   final GoogleSignInService googleSignIn;
@@ -105,6 +108,7 @@ class FanthrofitApp extends StatelessWidget {
 
   const FanthrofitApp({
     super.key,
+    required this.theme,
     required this.storage,
     required this.apiClient,
     required this.googleSignIn,
@@ -119,6 +123,9 @@ class FanthrofitApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        // --- Remote theme/config (loaded before runApp) --------------
+        Provider<ThemeConfig>.value(value: theme),
+
         // --- Services (pre-built singletons) -------------------------
         Provider<SecureStorageService>.value(value: storage),
         Provider<ApiClient>.value(value: apiClient),
