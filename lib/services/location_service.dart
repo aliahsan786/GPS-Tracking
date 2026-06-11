@@ -30,6 +30,13 @@ abstract class LocationService {
 }
 
 class LocationServiceImpl implements LocationService {
+  /// Target cadence for GPS fixes. Sourced from the remote theme
+  /// (`tracking_interval_seconds`) at startup; falls back to [Env].
+  final Duration interval;
+
+  LocationServiceImpl({Duration? interval})
+      : interval = interval ?? Env.locationInterval;
+
   final StreamController<LocationPoint> _controller =
       StreamController<LocationPoint>.broadcast();
   StreamSubscription<Position>? _subscription;
@@ -84,7 +91,7 @@ class LocationServiceImpl implements LocationService {
       return AndroidSettings(
         accuracy: LocationAccuracy.high,
         distanceFilter: 0,
-        intervalDuration: Env.locationInterval,
+        intervalDuration: interval,
         foregroundNotificationConfig: const ForegroundNotificationConfig(
           notificationTitle: 'GPS Tracker',
           notificationText: 'Tracking your activity',

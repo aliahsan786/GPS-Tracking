@@ -37,7 +37,28 @@ class ThemeServiceImpl implements ThemeService {
               connectTimeout: const Duration(seconds: 8),
               receiveTimeout: const Duration(seconds: 8),
               responseType: ResponseType.json,
-            ));
+            )) {
+    _dio.interceptors.add(InterceptorsWrapper(
+      onRequest: (options, handler) {
+        if (kDebugMode) debugPrint('[API →] ${options.method} ${options.uri}');
+        handler.next(options);
+      },
+      onResponse: (response, handler) {
+        if (kDebugMode) {
+          debugPrint('[API ←] ${response.statusCode} '
+              '${response.requestOptions.method} ${response.requestOptions.uri}');
+        }
+        handler.next(response);
+      },
+      onError: (error, handler) {
+        if (kDebugMode) {
+          debugPrint('[API ✗] ${error.response?.statusCode} '
+              '${error.requestOptions.uri} | ${error.message}');
+        }
+        handler.next(error);
+      },
+    ));
+  }
 
   /// Baked-in palette + asset URLs. These mirror the current backend
   /// values so the app looks correct even on a cold first launch with no

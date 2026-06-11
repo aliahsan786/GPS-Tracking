@@ -77,7 +77,9 @@ Future<void> main() async {
   final apiClient = ApiClient(storage: storage, authEvents: authEvents);
   final googleSignIn = GoogleSignInServiceImpl();
   final appleSignIn = AppleSignInServiceImpl();
-  final locationService = LocationServiceImpl();
+  final locationService = LocationServiceImpl(
+    interval: Duration(seconds: theme.trackingIntervalSeconds),
+  );
   final connectivityService = ConnectivityServiceImpl();
 
   runApp(
@@ -170,6 +172,7 @@ class FanthrofitApp extends StatelessWidget {
             locationService: ctx.read<LocationService>(),
             auth: ctx.read<AuthProvider>(),
             connectivity: ctx.read<ConnectivityProvider>(),
+            liveInterval: Duration(seconds: theme.trackingIntervalSeconds),
           ),
         ),
       ],

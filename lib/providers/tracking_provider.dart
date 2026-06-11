@@ -78,6 +78,10 @@ class TrackingProvider extends ChangeNotifier {
   final AuthProvider _auth;
   final ConnectivityProvider _connectivity;
 
+  /// Cadence for live transmission while tracking is active. Sourced from
+  /// the remote theme (`tracking_interval_seconds`).
+  final Duration _liveInterval;
+
   _SessionPhase _session = const _SessionNone();
   _SyncPhase _sync = const _SyncIdle();
   SessionSummary? _lastActivity;
@@ -88,17 +92,27 @@ class TrackingProvider extends ChangeNotifier {
   bool _wasOnline = true;
   LocationPoint? _lastPoint;
 
+  /// Periodic driver that pushes queued points to the server every
+  /// [_liveInterval] while a session is active.
+  Timer? _liveTimer;
+
+  /// Reentrancy guard for [_liveFlush] so overlapping ticks (timer + new
+  /// point + reconnect) don't double-send.
+  bool _liveFlushing = false;
+
   TrackingProvider({
     required TrackingRepository trackingRepo,
     required LocationRepository locationRepo,
     required LocationService locationService,
     required AuthProvider auth,
     required ConnectivityProvider connectivity,
+    Duration? liveInterval,
   })  : _trackingRepo = trackingRepo,
         _locationRepo = locationRepo,
         _locationService = locationService,
         _auth = auth,
-        _connectivity = connectivity {
+        _connectivity = connectivity,
+        _liveInterval = liveInterval ?? const Duration(seconds: 5) {
     _wasOnline = connectivity.online;
     _auth.addListener(_onAuthChanged);
     _connectivity.addListener(_onConnectivityChanged);
@@ -172,6 +186,12 @@ class TrackingProvider extends ChangeNotifier {
       _lastPoint = null;
       await _locationService.start();
       _locationSub = _locationService.stream.listen(_onLocation);
+      // Live transmission: push queued points to the server every
+      // [_liveInterval] for the duration of the session. The timer is a
+      // safety net (retries, iOS GPS variance) on top of the per-point
+      // flush in [_onLocation].
+      _liveTimer?.cancel();
+      _liveTimer = Timer.periodic(_liveInterval, (_) => unawaited(_liveFlush()));
       notifyListeners();
     } catch (_) {
       _session = const _SessionNone();
@@ -186,12 +206,20 @@ class TrackingProvider extends ChangeNotifier {
     _session = const _SessionStopping();
     notifyListeners();
 
+    // Stop the live driver and GPS first so nothing new enqueues.
+    _liveTimer?.cancel();
+    _liveTimer = null;
     await _locationSub?.cancel();
     _locationSub = null;
     await _locationService.stop();
     _lastPoint = null;
 
     if (current is _SessionActive) {
+      // Per the live-tracking contract: upload any remaining unsent points
+      // BEFORE closing the session. Best-effort — if offline, points stay
+      // queued and drain later via _maybeFlush / on reconnect.
+      await _liveFlush();
+
       try {
         await _trackingRepo.closeSession(current.session.id);
       } on DomainError {
@@ -248,16 +276,40 @@ class TrackingProvider extends ChangeNotifier {
     _session = _SessionActive(session);
     _lastPoint = point;
 
+    // Persist first (durable buffer that survives offline / app death),
+    // then transmit live.
     await _locationRepo.enqueue(
       trackingSessionId: session.id,
       point: point,
     );
     _queuedCount = await _locationRepo.pendingCount();
-
-    // Don't flush mid-tracking — points accumulate locally and drain
-    // when the user taps Stop. This matches the Figma flow where the
-    // Syncing screen only appears after the session ends.
     notifyListeners();
+
+    // Live tracking: send the point to the server in real time as it is
+    // collected. If offline, it stays queued and is retried by the live
+    // timer and on reconnect — never lost.
+    unawaited(_liveFlush());
+  }
+
+  /// Sends queued points to the server **during an active session**,
+  /// oldest-first (chronological). Unlike [_maybeFlush] this never shows
+  /// the full-screen Syncing UI — tracking stays visible — and on failure
+  /// it simply leaves the points queued to retry on the next tick or
+  /// reconnect. No-op when offline or already flushing.
+  Future<void> _liveFlush() async {
+    if (_liveFlushing) return;
+    if (!_connectivity.online) return;
+    _liveFlushing = true;
+    try {
+      await _locationRepo.flush();
+      _queuedCount = await _locationRepo.pendingCount();
+      _lastSyncAt = DateTime.now();
+      notifyListeners();
+    } on DomainError {
+      // Transient (network/server) — keep points queued; retry later.
+    } finally {
+      _liveFlushing = false;
+    }
   }
 
   /// Minimum time the Syncing card stays on screen, even if the actual
@@ -310,6 +362,8 @@ class TrackingProvider extends ChangeNotifier {
     // cleanly so we don't keep draining GPS in the background.
     if (_auth.status != AuthStatus.authenticated &&
         _session is _SessionActive) {
+      _liveTimer?.cancel();
+      _liveTimer = null;
       _locationSub?.cancel();
       _locationSub = null;
       _locationService.stop();
@@ -325,11 +379,16 @@ class TrackingProvider extends ChangeNotifier {
 
   void _onConnectivityChanged() {
     final nowOnline = _connectivity.online;
-    // Auto-flush on reconnect only when not actively tracking. During
-    // a live session we deliberately hold points locally and drain on
-    // Stop, so we don't fire the Syncing screen mid-activity.
-    if (nowOnline && !_wasOnline && _session is! _SessionActive) {
-      unawaited(_maybeFlush());
+    if (nowOnline && !_wasOnline) {
+      if (_session is _SessionActive) {
+        // Back online mid-session: upload the points missed while offline,
+        // oldest-first, then resume normal live transmission. No Syncing
+        // screen — tracking stays visible.
+        unawaited(_liveFlush());
+      } else {
+        // Idle: drain any leftover queue with the Syncing UI.
+        unawaited(_maybeFlush());
+      }
     }
     _wasOnline = nowOnline;
     notifyListeners();
@@ -339,6 +398,7 @@ class TrackingProvider extends ChangeNotifier {
   void dispose() {
     _auth.removeListener(_onAuthChanged);
     _connectivity.removeListener(_onConnectivityChanged);
+    _liveTimer?.cancel();
     _locationSub?.cancel();
     super.dispose();
   }

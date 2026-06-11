@@ -41,13 +41,30 @@ class ApiClient {
     );
 
     _dio.interceptors.add(InterceptorsWrapper(
+      onRequest: (options, handler) {
+        if (kDebugMode) {
+          debugPrint('[API →] ${options.method} ${options.uri}');
+          if (options.data != null) {
+            debugPrint('[API →] body: ${options.data}');
+          }
+        }
+        handler.next(options);
+      },
+      onResponse: (response, handler) {
+        if (kDebugMode) {
+          final req = response.requestOptions;
+          debugPrint(
+              '[API ←] ${response.statusCode} ${req.method} ${req.uri}');
+        }
+        handler.next(response);
+      },
       onError: (error, handler) {
         // TEMP DIAGNOSTIC: dump the exact request + response so we can
         // hand the raw payloads to the backend team. Debug builds only.
         if (kDebugMode) {
           final req = error.requestOptions;
           debugPrint('───── API ERROR ─────');
-          debugPrint('POST ${req.uri}');
+          debugPrint('${req.method} ${req.uri}');
           debugPrint('REQUEST BODY: ${req.data}');
           debugPrint('STATUS: ${error.response?.statusCode}');
           debugPrint('RESPONSE BODY: ${error.response?.data}');
