@@ -6,6 +6,7 @@ import '../../models/theme_config.dart';
 import '../../models/tracking_ui_state.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/tracking_provider.dart';
+import '../../services/secure_storage_service.dart';
 import 'tracking_screen.dart';
 import 'tracking_webview_screen.dart';
 
@@ -52,8 +53,18 @@ class TrackingScreenHost extends StatelessWidget {
     // Permission denied or session failed -> stay on the tracking screen.
     if (tracking.uiState is! TrackingActive) return;
 
-    final url = context.read<ThemeConfig>().webviewStartUrl;
-    if (url == null || url.isEmpty) return; // no portal configured
+    final baseUrl = context.read<ThemeConfig>().webviewStartUrl;
+    if (baseUrl == null || baseUrl.isEmpty) return; // no portal configured
+
+    // The web portal (session bridge) needs the logged-in session to
+    // authenticate inside the WebView, so append the session token to the
+    // JSON-provided URL: <webview_start_url>?session_token=<token>.
+    final storage = context.read<SecureStorageService>();
+    final token = await storage.readSessionToken();
+    if (!context.mounted) return;
+
+    final url = _withSessionToken(baseUrl, token);
+    debugPrint('[webview] opening portal: $url');
 
     await Navigator.of(context).push(
       MaterialPageRoute(
@@ -63,6 +74,20 @@ class TrackingScreenHost extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Appends `session_token=<token>` to [base] as a query parameter,
+  /// merging safely if the URL already has a query string. Returns [base]
+  /// unchanged when there's no token.
+  String _withSessionToken(String base, String? token) {
+    if (token == null || token.isEmpty) return base;
+    final uri = Uri.parse(base);
+    return uri.replace(
+      queryParameters: {
+        ...uri.queryParameters,
+        'session_token': token,
+      },
+    ).toString();
   }
 
   Future<void> _logoutToLogin(BuildContext context) async {

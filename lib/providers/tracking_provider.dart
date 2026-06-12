@@ -100,6 +100,10 @@ class TrackingProvider extends ChangeNotifier {
   /// point + reconnect) don't double-send.
   bool _liveFlushing = false;
 
+  /// Counts heartbeat ticks within the current session (for the cadence
+  /// log). Reset to 0 each time a session starts.
+  int _heartbeatTick = 0;
+
   TrackingProvider({
     required TrackingRepository trackingRepo,
     required LocationRepository locationRepo,
@@ -112,11 +116,16 @@ class TrackingProvider extends ChangeNotifier {
         _locationService = locationService,
         _auth = auth,
         _connectivity = connectivity,
-        _liveInterval = liveInterval ?? const Duration(seconds: 5) {
+        _liveInterval = _resolveInterval(liveInterval) {
     _wasOnline = connectivity.online;
     _auth.addListener(_onAuthChanged);
     _connectivity.addListener(_onConnectivityChanged);
   }
+
+  /// Guards against a missing or non-positive interval (which would make
+  /// `Timer.periodic` fire continuously). Falls back to 5s.
+  static Duration _resolveInterval(Duration? d) =>
+      (d == null || d.inSeconds < 1) ? const Duration(seconds: 5) : d;
 
   // --- Derived UI state -----------------------------------------------------
 
@@ -186,12 +195,14 @@ class TrackingProvider extends ChangeNotifier {
       _lastPoint = null;
       await _locationService.start();
       _locationSub = _locationService.stream.listen(_onLocation);
-      // Live transmission: push queued points to the server every
-      // [_liveInterval] for the duration of the session. The timer is a
-      // safety net (retries, iOS GPS variance) on top of the per-point
-      // flush in [_onLocation].
+      // Heartbeat: every [_liveInterval] grab the current location and
+      // send it (same point or not). This is the live-tracking driver —
+      // transmission is timer-paced, not per-GPS-fix.
+      debugPrint('[tracking] live heartbeat started — every '
+          '${_liveInterval.inSeconds}s (from theme)');
+      _heartbeatTick = 0;
       _liveTimer?.cancel();
-      _liveTimer = Timer.periodic(_liveInterval, (_) => unawaited(_liveFlush()));
+      _liveTimer = Timer.periodic(_liveInterval, (_) => unawaited(_heartbeat()));
       notifyListeners();
     } catch (_) {
       _session = const _SessionNone();
@@ -274,20 +285,44 @@ class TrackingProvider extends ChangeNotifier {
       duration: DateTime.now().difference(session.startedAt),
     );
     _session = _SessionActive(session);
+    // The GPS stream only keeps the *current* location fresh (and drives
+    // the on-screen distance/time). Transmission is NOT per-fix — it's the
+    // fixed N-second [_heartbeat]. See the heartbeat for the actual send.
     _lastPoint = point;
+    notifyListeners();
+  }
 
-    // Persist first (durable buffer that survives offline / app death),
-    // then transmit live.
+  /// Heartbeat: every [_liveInterval], take the current location and send
+  /// it to the server — whether or not it changed since the last tick.
+  ///
+  /// The point is enqueued first (durable buffer that survives offline /
+  /// app death), then [_liveFlush] transmits. While online and caught up
+  /// this is one POST per tick (the latest location). While offline the
+  /// queue grows one point per tick and is replayed oldest-first on
+  /// reconnect.
+  Future<void> _heartbeat() async {
+    final current = _session;
+    if (current is! _SessionActive) return;
+
+    _heartbeatTick++;
+    final elapsed = _heartbeatTick * _liveInterval.inSeconds;
+    debugPrint('━━━━━━━━━━━━━━━ ${_liveInterval.inSeconds}s tick '
+        '#$_heartbeatTick · ${elapsed}s elapsed ━━━━━━━━━━━━━━━');
+
+    final point = _lastPoint; // most recent GPS fix = current location
+    if (point == null) {
+      debugPrint('[tracking] tick #$_heartbeatTick — no GPS fix yet, skipping');
+      return; // no fix yet — wait for the next tick
+    }
+
+    debugPrint('[tracking] tick #$_heartbeatTick → queueing current location');
     await _locationRepo.enqueue(
-      trackingSessionId: session.id,
+      trackingSessionId: current.session.id,
       point: point,
     );
     _queuedCount = await _locationRepo.pendingCount();
     notifyListeners();
 
-    // Live tracking: send the point to the server in real time as it is
-    // collected. If offline, it stays queued and is retried by the live
-    // timer and on reconnect — never lost.
     unawaited(_liveFlush());
   }
 
