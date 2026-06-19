@@ -53,23 +53,35 @@ class TrackingScreenHost extends StatelessWidget {
     // Permission denied or session failed -> stay on the tracking screen.
     if (tracking.uiState is! TrackingActive) return;
 
-    final baseUrl = context.read<ThemeConfig>().webviewStartUrl;
-    if (baseUrl == null || baseUrl.isEmpty) return; // no portal configured
+    final theme = context.read<ThemeConfig>();
+    final startBase = theme.webviewStartUrl;
+    if (startBase == null || startBase.isEmpty) return; // no portal configured
 
-    // The web portal (session bridge) needs the logged-in session to
-    // authenticate inside the WebView, so append the session token to the
-    // JSON-provided URL: <webview_start_url>?session_token=<token>.
+    // The web portal pages need the logged-in session to authenticate
+    // inside the WebView, so append the session token to the JSON-provided
+    // URLs: <url>?session_token=<token>.
     final storage = context.read<SecureStorageService>();
     final token = await storage.readSessionToken();
     if (!context.mounted) return;
 
-    final url = _withSessionToken(baseUrl, token);
-    debugPrint('[webview] opening portal: $url');
+    final startUrl = _withSessionToken(startBase, token);
+    final stopUrl = theme.webviewStopUrl != null
+        ? _withSessionToken(theme.webviewStopUrl!, token)
+        : null;
+    debugPrint('[webview] start url: $startUrl');
+    debugPrint('[webview] stop url: $stopUrl');
 
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => TrackingWebViewScreen(
-          url: url,
+          startUrl: startUrl,
+          stopUrl: stopUrl,
+          // Re-run the real start flow; report whether it actually started
+          // so the WebView only switches to the tracking page on success.
+          onStart: () async {
+            await tracking.startTracking();
+            return tracking.uiState is TrackingActive;
+          },
           onStop: tracking.stopTracking,
         ),
       ),

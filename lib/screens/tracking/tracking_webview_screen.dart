@@ -1,29 +1,44 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_text_styles.dart';
 import '../../widgets/common/primary_button.dart';
 
-/// Shown while a tracking session is active.
+/// The web portal shown while tracking is active (and after it stops).
 ///
 /// Reached by pushing on top of the tracking screen right after
-/// `startTracking()` succeeds. GPS continues recording in the background
-/// (the TrackingProvider owns that); this screen only displays the
-/// company web portal and the Stop control.
+/// `startTracking()` succeeds. The user stays inside this screen and
+/// toggles tracking with the bottom button:
 ///
-/// [onStop] runs the normal stop logic (drain queue, close session, etc).
-/// After it completes this screen pops, returning to the tracking screen
-/// which then reflects the post-stop state (Idle / Syncing).
+///  - **Stop Tracking** → runs the real stop flow, then loads [stopUrl]
+///    in the same WebView and flips the button to "Start Tracking".
+///  - **Start Tracking** → runs the real start flow, then loads [startUrl]
+///    and flips the button back to "Stop Tracking".
+///
+/// A top-left back button returns to the native tracking screen without
+/// changing the tracking state.
 class TrackingWebViewScreen extends StatefulWidget {
-  final String url;
+  /// Portal page for an active session (session token already appended).
+  final String startUrl;
+
+  /// Portal page shown after stopping (session token already appended).
+  /// Null falls back to staying on [startUrl].
+  final String? stopUrl;
+
+  /// Runs the real start flow. Returns true if a session actually became
+  /// active (false e.g. when permission was denied).
+  final Future<bool> Function() onStart;
+
+  /// Runs the real stop flow (upload remaining points + close session).
   final Future<void> Function() onStop;
 
   const TrackingWebViewScreen({
     super.key,
-    required this.url,
+    required this.startUrl,
+    required this.stopUrl,
+    required this.onStart,
     required this.onStop,
   });
 
@@ -34,7 +49,8 @@ class TrackingWebViewScreen extends StatefulWidget {
 class _TrackingWebViewScreenState extends State<TrackingWebViewScreen> {
   late final WebViewController _controller;
   bool _loading = true;
-  bool _stopping = false;
+  bool _busy = false; // start/stop in flight
+  bool _tracking = true; // we arrive here right after a successful start
 
   @override
   void initState() {
@@ -52,61 +68,94 @@ class _TrackingWebViewScreenState extends State<TrackingWebViewScreen> {
           },
         ),
       )
-      ..loadRequest(Uri.parse(widget.url));
+      ..loadRequest(Uri.parse(widget.startUrl));
   }
 
-  void _handleStop() {
-    if (_stopping) return;
-    setState(() => _stopping = true);
+  Future<void> _handleStop() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    await widget.onStop();
+    if (!mounted) return;
+    // Stay in the WebView: load the stop page and flip to "Start".
+    final next = widget.stopUrl ?? widget.startUrl;
+    await _controller.loadRequest(Uri.parse(next));
+    if (!mounted) return;
+    setState(() {
+      _tracking = false;
+      _busy = false;
+    });
+  }
 
-    // Return to the tracking screen *first*, then run the normal stop +
-    // upload flow on the provider. This way the tracking screen is visible
-    // while the queued points drain, so its "Syncing data..." progress
-    // screen shows — exactly as before the web portal was added. The
-    // provider runs independently of this (now-disposed) screen.
-    Navigator.of(context).pop();
-    unawaited(widget.onStop());
+  Future<void> _handleStart() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final started = await widget.onStart();
+    if (!mounted) return;
+    if (!started) {
+      // Permission denied / failed — stay on the stop page.
+      setState(() => _busy = false);
+      return;
+    }
+    await _controller.loadRequest(Uri.parse(widget.startUrl));
+    if (!mounted) return;
+    setState(() {
+      _tracking = true;
+      _busy = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    // Block the back gesture/button: the session must end via Stop so the
-    // tracking screen returns in a consistent post-stop state.
-    return PopScope(
-      canPop: false,
-      child: Scaffold(
+    return Scaffold(
+      backgroundColor: AppColors.backgroundCream,
+      appBar: AppBar(
         backgroundColor: AppColors.backgroundCream,
-        body: SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: Stack(
-                  children: [
-                    WebViewWidget(controller: _controller),
-                    if (_loading)
-                      Center(
-                        child: CircularProgressIndicator(
-                          color: AppColors.primaryRed,
-                        ),
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_rounded, color: AppColors.primaryRed),
+          tooltip: 'Back',
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
+        title: Text('Fanthrofit', style: AppTextStyles.h4),
+      ),
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            Expanded(
+              child: Stack(
+                children: [
+                  WebViewWidget(controller: _controller),
+                  if (_loading)
+                    Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.primaryRed,
                       ),
-                  ],
-                ),
+                    ),
+                ],
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.screenHPadding,
-                  AppSpacing.md,
-                  AppSpacing.screenHPadding,
-                  AppSpacing.lg,
-                ),
-                child: PrimaryButton(
-                  label: 'Stop Tracking',
-                  loading: _stopping,
-                  onPressed: _stopping ? null : _handleStop,
-                ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.screenHPadding,
+                AppSpacing.md,
+                AppSpacing.screenHPadding,
+                AppSpacing.lg,
               ),
-            ],
-          ),
+              child: _tracking
+                  ? PrimaryButton(
+                      label: 'Stop Tracking',
+                      loading: _busy,
+                      onPressed: _busy ? null : _handleStop,
+                    )
+                  : PrimaryButton(
+                      label: 'Start Tracking',
+                      loading: _busy,
+                      onPressed: _busy ? null : _handleStart,
+                    ),
+            ),
+          ],
         ),
       ),
     );

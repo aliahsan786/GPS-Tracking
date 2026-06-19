@@ -150,6 +150,18 @@ class ApiClient {
       return const <String, dynamic>{};
     }
 
+    // PHP backend convention: `{status: "success"|"error", message, ...}`.
+    // Error responses come back with HTTP 200 + status:error, so surface
+    // the backend's message as a proper error instead of letting the
+    // success-shaped parsing downstream blow up.
+    if (body['status'] == 'error') {
+      throw ServerError(
+        statusCode: response.statusCode,
+        code: body['code'] as String?,
+        message: (body['message'] as String?) ?? 'Server error',
+      );
+    }
+
     // Lenient: bare JSON object. Used for the current mock endpoints and
     // any backend that decides not to wrap. Repositories must tolerate
     // missing fields.

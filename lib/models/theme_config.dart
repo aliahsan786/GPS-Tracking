@@ -22,6 +22,7 @@ class ThemeConfig {
 
   // App config.
   final String? webviewStartUrl;
+  final String? webviewStopUrl;
   final int trackingIntervalSeconds;
 
   const ThemeConfig({
@@ -34,6 +35,7 @@ class ThemeConfig {
     required this.logoUrl,
     required this.backgroundUrl,
     required this.webviewStartUrl,
+    required this.webviewStopUrl,
     required this.trackingIntervalSeconds,
   });
 
@@ -68,14 +70,18 @@ class ThemeConfig {
       text: color('text', defaults.text),
       logoUrl: url('logo_url', defaults.logoUrl),
       backgroundUrl: url('background_url', defaults.backgroundUrl),
-      webviewStartUrl: (app is Map && app['webview_start_url'] is String &&
-              (app['webview_start_url'] as String).isNotEmpty)
-          ? app['webview_start_url'] as String
-          : defaults.webviewStartUrl,
+      webviewStartUrl: _appString(app, 'webview_start_url', defaults.webviewStartUrl),
+      webviewStopUrl: _appString(app, 'webview_stop_url', defaults.webviewStopUrl),
       trackingIntervalSeconds: (app is Map && app['tracking_interval_seconds'] is int)
           ? app['tracking_interval_seconds'] as int
           : defaults.trackingIntervalSeconds,
     );
+  }
+
+  static String? _appString(dynamic app, String key, String? fallback) {
+    if (app is! Map) return fallback;
+    final v = app[key];
+    return (v is String && v.isNotEmpty) ? v : fallback;
   }
 
   /// Round-trips to the same JSON shape we cache locally.
@@ -94,6 +100,7 @@ class ThemeConfig {
         },
         'app': {
           'webview_start_url': webviewStartUrl,
+          'webview_stop_url': webviewStopUrl,
           'tracking_interval_seconds': trackingIntervalSeconds,
         },
       };

@@ -73,6 +73,7 @@ class ThemeServiceImpl implements ThemeService {
     logoUrl: null,
     backgroundUrl: null,
     webviewStartUrl: null,
+    webviewStopUrl: null,
     trackingIntervalSeconds: 5,
   );
 
