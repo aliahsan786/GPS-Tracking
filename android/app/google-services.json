@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "1021928700381-olplvsf1jcn9b8uq37h87hnaug51hjen.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.gps_tracking",
+            "certificate_hash": "fdd80bb2f0d507404f379548e20906ba384a3e6c"
+          }
+        },
+        {
           "client_id": "1021928700381-0fss1sdo7870o8fh9m3sh4iqpin5u1ug.apps.googleusercontent.com",
           "client_type": 3
         }

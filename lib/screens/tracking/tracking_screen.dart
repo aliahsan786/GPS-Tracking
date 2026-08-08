@@ -9,7 +9,6 @@ import '../../widgets/common/alert_banner.dart';
 import '../../widgets/common/primary_button.dart';
 import '../../widgets/tracking/big_alert_icon.dart';
 import '../../widgets/tracking/pulsing_pin.dart';
-import '../../widgets/tracking/stats_card.dart';
 import '../../widgets/tracking/sync_progress_card.dart';
 import '../../widgets/tracking/tracking_app_bar.dart';
 import '../../widgets/tracking/tracking_background.dart';
@@ -27,6 +26,10 @@ class TrackingScreen extends StatelessWidget {
   final VoidCallback onLoginAgain;
   final VoidCallback onLogout;
 
+  /// Opens the standalone Dashboard web page (always available alongside
+  /// the Start/Stop control).
+  final VoidCallback onDashboard;
+
   const TrackingScreen({
     super.key,
     required this.state,
@@ -35,6 +38,7 @@ class TrackingScreen extends StatelessWidget {
     required this.onRetrySync,
     required this.onLoginAgain,
     required this.onLogout,
+    required this.onDashboard,
   });
 
   @override
@@ -67,28 +71,24 @@ class TrackingScreen extends StatelessWidget {
     // Dart 3 pattern matching — each branch returns a variant-specific
     // body that fills the available vertical space.
     return switch (state) {
-      TrackingInitializing() => _InitializingBody(onStop: onStopTracking),
-      TrackingIdle(:final lastActivity, :final isOffline) => _IdleBody(
-        activityName: lastActivity?.name,
-        distance: lastActivity != null
-            ? Formatters.distance(lastActivity.distanceMeters)
-            : null,
-        time: lastActivity != null
-            ? Formatters.duration(lastActivity.duration)
-            : null,
+      TrackingInitializing() => _InitializingBody(
+        onStop: onStopTracking,
+        onDashboard: onDashboard,
+      ),
+      TrackingIdle(:final isOffline) => _IdleBody(
         isOffline: isOffline,
         onStart: onStartTracking,
+        onDashboard: onDashboard,
       ),
-      TrackingActive(:final session, :final isOffline) => _ActiveBody(
-        activityName: session.activityName,
-        distance: Formatters.distance(session.distanceMeters),
-        time: Formatters.duration(session.duration),
+      TrackingActive(:final isOffline) => _ActiveBody(
         isOffline: isOffline,
         onStop: onStopTracking,
+        onDashboard: onDashboard,
       ),
       TrackingSyncing(:final bytesSent, :final bytesTotal) => _SyncingBody(
         bytesSent: bytesSent,
         bytesTotal: bytesTotal,
+        onDashboard: onDashboard,
       ),
       TrackingSyncFailed(:final lastSyncAt) => _AlertBody(
         title: 'Sync failed',
@@ -106,11 +106,45 @@ class TrackingScreen extends StatelessWidget {
   }
 }
 
+/// Bottom action row: the Start/Stop control on the left and the Dashboard
+/// button on the right, equal width. Dashboard is always present.
+class _BottomActions extends StatelessWidget {
+  final String primaryLabel;
+  final VoidCallback? onPrimary;
+  final VoidCallback onDashboard;
+
+  const _BottomActions({
+    required this.primaryLabel,
+    required this.onPrimary,
+    required this.onDashboard,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: PrimaryButton(label: primaryLabel, onPressed: onPrimary),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: PrimaryButton(
+            label: 'Dashboard',
+            onPressed: onDashboard,
+            variant: PrimaryButtonVariant.teal,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// S_Init — Initializing (permissions + session creation in flight)
 class _InitializingBody extends StatelessWidget {
   final VoidCallback onStop;
+  final VoidCallback onDashboard;
 
-  const _InitializingBody({required this.onStop});
+  const _InitializingBody({required this.onStop, required this.onDashboard});
 
   @override
   Widget build(BuildContext context) {
@@ -125,8 +159,11 @@ class _InitializingBody extends StatelessWidget {
             pinIcon: Icons.language_rounded,
           ),
         ),
-        // Design: single full-width Stop button (no Pause).
-        PrimaryButton(label: 'Stop Tracking', onPressed: onStop),
+        _BottomActions(
+          primaryLabel: 'Stop Tracking',
+          onPrimary: onStop,
+          onDashboard: onDashboard,
+        ),
       ],
     );
   }
@@ -134,25 +171,20 @@ class _InitializingBody extends StatelessWidget {
 
 /// S4 — Idle
 class _IdleBody extends StatelessWidget {
-  final String? activityName;
-  final String? distance;
-  final String? time;
   final bool isOffline;
   final VoidCallback onStart;
+  final VoidCallback onDashboard;
 
   const _IdleBody({
-    required this.activityName,
-    required this.distance,
-    required this.time,
     required this.isOffline,
     required this.onStart,
+    required this.onDashboard,
   });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        StatsCard(activityName: activityName, distance: distance, time: time),
         const Expanded(child: _PinAndStatus(label: 'Tracking is off')),
         if (isOffline) ...[
           const AlertBanner(
@@ -162,9 +194,10 @@ class _IdleBody extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.md),
         ],
-        PrimaryButton(
-          label: 'Start Tracking',
-          onPressed: isOffline ? null : onStart,
+        _BottomActions(
+          primaryLabel: 'Start Tracking',
+          onPrimary: isOffline ? null : onStart,
+          onDashboard: onDashboard,
         ),
       ],
     );
@@ -173,29 +206,20 @@ class _IdleBody extends StatelessWidget {
 
 /// S7 — Active (with optional offline banner)
 class _ActiveBody extends StatelessWidget {
-  final String? activityName;
-  final String distance;
-  final String time;
   final bool isOffline;
   final VoidCallback onStop;
+  final VoidCallback onDashboard;
 
   const _ActiveBody({
-    required this.activityName,
-    required this.distance,
-    required this.time,
     required this.isOffline,
     required this.onStop,
+    required this.onDashboard,
   });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        StatsCard(
-          activityName: activityName ?? 'In progress',
-          distance: distance,
-          time: time,
-        ),
         const Expanded(child: _PinAndStatus(label: 'Tracking in progress')),
         if (isOffline) ...[
           const AlertBanner(
@@ -205,8 +229,11 @@ class _ActiveBody extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.md),
         ],
-        // Design: a single full-width Stop button (no Pause).
-        PrimaryButton(label: 'Stop Tracking', onPressed: onStop),
+        _BottomActions(
+          primaryLabel: 'Stop Tracking',
+          onPrimary: onStop,
+          onDashboard: onDashboard,
+        ),
       ],
     );
   }
@@ -216,8 +243,13 @@ class _ActiveBody extends StatelessWidget {
 class _SyncingBody extends StatelessWidget {
   final int bytesSent;
   final int bytesTotal;
+  final VoidCallback onDashboard;
 
-  const _SyncingBody({required this.bytesSent, required this.bytesTotal});
+  const _SyncingBody({
+    required this.bytesSent,
+    required this.bytesTotal,
+    required this.onDashboard,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -225,8 +257,12 @@ class _SyncingBody extends StatelessWidget {
       children: [
         SyncProgressCard(bytesSent: bytesSent, bytesTotal: bytesTotal),
         const Spacer(),
-        // Start button is visible but disabled while a flush is in flight.
-        const PrimaryButton(label: 'Start Tracking', onPressed: null),
+        // Start is disabled while a flush is in flight; Dashboard stays on.
+        _BottomActions(
+          primaryLabel: 'Start Tracking',
+          onPrimary: null,
+          onDashboard: onDashboard,
+        ),
       ],
     );
   }

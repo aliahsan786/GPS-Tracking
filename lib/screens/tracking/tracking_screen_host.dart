@@ -7,6 +7,7 @@ import '../../models/tracking_ui_state.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/tracking_provider.dart';
 import '../../services/secure_storage_service.dart';
+import '../web/web_page_screen.dart';
 import 'tracking_screen.dart';
 import 'tracking_webview_screen.dart';
 
@@ -34,6 +35,7 @@ class TrackingScreenHost extends StatelessWidget {
           onRetrySync: tracking.retrySync,
           onLoginAgain: () => _logoutToLogin(ctx),
           onLogout: () => _logoutToLogin(ctx),
+          onDashboard: () => _openDashboard(ctx),
         );
       },
     );
@@ -83,7 +85,29 @@ class TrackingScreenHost extends StatelessWidget {
             return tracking.uiState is TrackingActive;
           },
           onStop: tracking.stopTracking,
+          onDashboard: () => _openDashboard(context),
         ),
+      ),
+    );
+  }
+
+  /// Opens the standalone Dashboard page (`dashboard2_url` from the theme
+  /// JSON) in a WebView, with the session token appended. JSON-driven so
+  /// the destination can change without an app update.
+  Future<void> _openDashboard(BuildContext context) async {
+    final base = context.read<ThemeConfig>().dashboard2Url;
+    if (base == null || base.isEmpty) return; // not configured
+
+    final storage = context.read<SecureStorageService>();
+    final token = await storage.readSessionToken();
+    if (!context.mounted) return;
+
+    final url = _withSessionToken(base, token);
+    debugPrint('[dashboard] opening: $url');
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => WebPageScreen(url: url, title: 'Dashboard'),
       ),
     );
   }

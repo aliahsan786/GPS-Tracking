@@ -34,12 +34,17 @@ class TrackingWebViewScreen extends StatefulWidget {
   /// Runs the real stop flow (upload remaining points + close session).
   final Future<void> Function() onStop;
 
+  /// Opens the standalone Dashboard page on top, same as the native
+  /// tracking screen. Stays available while inside the portal.
+  final VoidCallback onDashboard;
+
   const TrackingWebViewScreen({
     super.key,
     required this.startUrl,
     required this.stopUrl,
     required this.onStart,
     required this.onStop,
+    required this.onDashboard,
   });
 
   @override
@@ -143,17 +148,31 @@ class _TrackingWebViewScreenState extends State<TrackingWebViewScreen> {
                 AppSpacing.screenHPadding,
                 AppSpacing.lg,
               ),
-              child: _tracking
-                  ? PrimaryButton(
-                      label: 'Stop Tracking',
-                      loading: _busy,
-                      onPressed: _busy ? null : _handleStop,
-                    )
-                  : PrimaryButton(
-                      label: 'Start Tracking',
-                      loading: _busy,
-                      onPressed: _busy ? null : _handleStart,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _tracking
+                        ? PrimaryButton(
+                            label: 'Stop Tracking',
+                            loading: _busy,
+                            onPressed: _busy ? null : _handleStop,
+                          )
+                        : PrimaryButton(
+                            label: 'Start Tracking',
+                            loading: _busy,
+                            onPressed: _busy ? null : _handleStart,
+                          ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: PrimaryButton(
+                      label: 'Dashboard',
+                      onPressed: widget.onDashboard,
+                      variant: PrimaryButtonVariant.teal,
                     ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

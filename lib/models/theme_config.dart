@@ -23,6 +23,13 @@ class ThemeConfig {
   // App config.
   final String? webviewStartUrl;
   final String? webviewStopUrl;
+
+  /// Tracking-related dashboard page (`app.dashboard_url`).
+  final String? dashboardUrl;
+
+  /// Standalone Dashboard button destination (`app.dashboard2_url`).
+  final String? dashboard2Url;
+
   final int trackingIntervalSeconds;
 
   const ThemeConfig({
@@ -36,6 +43,8 @@ class ThemeConfig {
     required this.backgroundUrl,
     required this.webviewStartUrl,
     required this.webviewStopUrl,
+    required this.dashboardUrl,
+    required this.dashboard2Url,
     required this.trackingIntervalSeconds,
   });
 
@@ -72,6 +81,8 @@ class ThemeConfig {
       backgroundUrl: url('background_url', defaults.backgroundUrl),
       webviewStartUrl: _appString(app, 'webview_start_url', defaults.webviewStartUrl),
       webviewStopUrl: _appString(app, 'webview_stop_url', defaults.webviewStopUrl),
+      dashboardUrl: _appString(app, 'dashboard_url', defaults.dashboardUrl),
+      dashboard2Url: _appString(app, 'dashboard2_url', defaults.dashboard2Url),
       trackingIntervalSeconds: (app is Map && app['tracking_interval_seconds'] is int)
           ? app['tracking_interval_seconds'] as int
           : defaults.trackingIntervalSeconds,
@@ -101,6 +112,8 @@ class ThemeConfig {
         'app': {
           'webview_start_url': webviewStartUrl,
           'webview_stop_url': webviewStopUrl,
+          'dashboard_url': dashboardUrl,
+          'dashboard2_url': dashboard2Url,
           'tracking_interval_seconds': trackingIntervalSeconds,
         },
       };
